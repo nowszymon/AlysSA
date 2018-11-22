@@ -2,6 +2,8 @@ import pandas as pd
 import math
 import matplotlib.pyplot as plt
 
+#alpha
+
 class paths:
 	def Paths(df,dates,column,Range_start, Range_end, Plot_date):
 
