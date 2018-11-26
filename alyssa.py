@@ -1,162 +1,168 @@
 import pandas as pd
 import math
 import matplotlib.pyplot as plt
-
+from datetime import timedelta
 
 class paths:
-def Paths(df,dates,column,Range_start, Range_end, Plot_date, fix_dates):
+	def Paths(df,dates,column,Range_start, Range_end, Plot_date, fix_dates):
 
-    """
-    Generate price paths from historical data.
+		"""
+		Generate price paths from historical data.
 
-    df: pandas DataFrame, dates: list with dates as datetime ([parser.parse(x) for x in dates] can be used to change str to datetime), column: column with data in df, Range_start: numbers of days before the date,  Range_end: numbers of days after the date, Plot_date: plot line with latest data, type date as str, fix_dates: for non existing dates in df (i.e. weekends) fix add days until it finds session day
-    """
+		df: pandas DataFrame, dates: list with dates as datetime ([parser.parse(x) for x in dates] can be used to change str to datetime), column: column with data in df, Range_start: numbers of days before the date,  Range_end: numbers of days after the date, Plot_date: plot line with latest data, type date as str, fix_dates: for non existing dates in df (i.e. weekends) fix add days until it finds session day
+		"""
 
-    indexes = [] 
-    dates_c = dates.copy()
+		indexes = [] 
+		dates_c = dates.copy()
 
-    # whole operation for latest date
+		# whole operation for latest date
 
-    if Plot_date != '':
-        plot_date = parser.parse(Plot_date)
-        # plot_date = plot_date.date()
+		if Plot_date != '':
+			plot_date = parser.parse(Plot_date)
+			# plot_date = plot_date.date()
 
-        if df[df['Date']==plot_date]['Date'].empty:
-            print('ERROR! Plot_date is not in the df.')
+			if df[df['Date']==plot_date]['Date'].empty:
+				print('ERROR! Plot_date is not in the df.')
 
-        index_plot_date = []
-        index_plot_datex = df[df['Date']==plot_date].index
-        index_plot_date.extend(index_plot_datex)
-
-
-        final_plot_date = pd.DataFrame()
-
-        for x in range(Range_start,Range_end):
-            try:
-                final_plot_date.loc[x,0] = df.loc[index_plot_date[0]+x][column]
-            except:
-                continue
-
-        for i in range(len(final_plot_date)):
-            if i == abs(Range_start):
-                continue
-            try:
-                final_plot_date.iloc[i,0] = (final_plot_date.iloc[i,0]/final_plot_date.iloc[abs(Range_start),0]-1)*100
-            except:
-                continue
-
-        for i in range(0,1):
-            try:
-                final_plot_date.iloc[abs(Range_start),0] = 0      
-            except:
-                continue
-
-    # compare dates  
-    
-    non_dates = []
-    
-    for i in dates_c:
-        if df[df['Date']==i]['Date'].empty:
-            if fix_dates == True:
-                while df[df['Date']==i]['Date'].empty:
-                    i = i + timedelta(days=1)
-            else:
-                print('ERROR! {} is not in the df.'.format(i))
-                non_dates.append(i)
-        index = df[df['Date']==i].index
-        indexes.extend(index)
-         
-
-    # generate slices of data for selected dates        
-
-    final = pd.DataFrame()
-
-    for i in range(0,len(indexes)):
-        for x in range(Range_start,Range_end):
-            final.loc[x,i] = df.loc[indexes[i]+x][column]
-
-    # rebase
-
-    for date in final:
-        for i in range(len(final)):
-            if i == abs(Range_start):
-                continue
-            final.iloc[i,date] = (final.iloc[i,date]/final.iloc[abs(Range_start),date]-1)*100
-        final.iloc[abs(Range_start),date] = 0    
-
-    
-    # change column names to the dates
-
-    dates_for_columns = [x for x in dates_c if x not in non_dates]    
-    final = final.rename(columns=(lambda x:dates_for_columns[x].date()))
-    
-    # create df with min -> max values
-
-    path = pd.DataFrame()
-
-    for x in range(len(final.columns)):
-        for i in range(len(final)):
-            a = final.iloc[i,:]
-            b = a.sort_values()[x]
-            path.loc[i,x] = b
-            a = None
-            b = None 
-
-    path.index = final.index 
-
-    # chart                
-
-    fig, ax = plt.subplots(figsize=(15,12))
-
-    ax.set_xlabel('Days')
-    ax.set_ylabel('[%]')
-    ax.set_xlim(Range_start,Range_end)
-
-    if len(final.columns)%2 == 0: 
-
-        for i in range(len(path.columns)):
-            path[i].plot(ax=ax, color='Red', linewidth=0)
+			index_plot_date = []
+			index_plot_datex = df[df['Date']==plot_date].index
+			index_plot_date.extend(index_plot_datex)
 
 
+			final_plot_date = pd.DataFrame()
 
-        for i in range(0,math.trunc(len(final.columns)/2)):
-            ax.fill_between(path.index,path[i],path[2*math.trunc(len(final.columns)/2)-i-1],alpha=0.3,color='Pink')
+			for x in range(Range_start,Range_end):
+				try:
+					final_plot_date.loc[x,0] = df.loc[index_plot_date[0]+x][column]
+				except:
+					continue
 
-    else:
+			for i in range(len(final_plot_date)):
+				if i == abs(Range_start):
+					continue
+				try:
+					final_plot_date.iloc[i,0] = (final_plot_date.iloc[i,0]/final_plot_date.iloc[abs(Range_start),0]-1)*100
+				except:
+					continue
 
-        for i in [x for x in range(len(path.columns)) if x != math.trunc(len(path.columns)/2)]:
-            path[i].plot(ax=ax, color='Red', linewidth=0)
+			for i in range(0,1):
+				try:
+					final_plot_date.iloc[abs(Range_start),0] = 0      
+				except:
+					continue
 
-        path[math.trunc(len(path.columns)/2)].plot(ax=ax, color='Red', linewidth=0.1)    # mid line
+		# compare dates  
+		
+		non_dates = []
+		
+		for i in dates_c:
+			if df[df['Date']==i]['Date'].empty:
+				if fix_dates == True:
+					while df[df['Date']==i]['Date'].empty:
+						i = i + timedelta(days=1)
+				else:
+					print('ERROR! {} is not in the df.'.format(i))
+					non_dates.append(i)
+			index = df[df['Date']==i].index
+			indexes.extend(index)
+			 
+
+		# generate slices of data for selected dates        
+
+		final = pd.DataFrame()
+
+		for i in range(0,len(indexes)):
+			for x in range(Range_start,Range_end):
+				final.loc[x,i] = df.loc[indexes[i]+x][column]
+
+		# rebase
+
+		for date in final:
+			for i in range(len(final)):
+				if i == abs(Range_start):
+					continue
+				final.iloc[i,date] = (final.iloc[i,date]/final.iloc[abs(Range_start),date]-1)*100
+			final.iloc[abs(Range_start),date] = 0    
+
+		
+		# change column names to the dates
+
+		dates_for_columns = [x for x in dates_c if x not in non_dates]    
+		final = final.rename(columns=(lambda x:dates_for_columns[x].date()))
+		
+		# create df with min -> max values
+
+		path = pd.DataFrame()
+
+		for x in range(len(final.columns)):
+			for i in range(len(final)):
+				a = final.iloc[i,:]
+				b = a.sort_values()[x]
+				path.loc[i,x] = b
+				a = None
+				b = None 
+
+		path.index = final.index 
+
+		# chart                
+
+		fig, ax = plt.subplots(figsize=(15,12))
+
+		ax.set_xlabel('Days')
+		ax.set_ylabel('[%]')
+		ax.set_xlim(Range_start,Range_end)
+
+		if len(final.columns)%2 == 0: 
+
+			for i in range(len(path.columns)):
+				path[i].plot(ax=ax, color='Red', linewidth=0)
 
 
-        for i in [x for x in range(len(path.columns)) if x != math.trunc(len(path.columns)/2)]:
-            ax.fill_between(path.index,path[i],path[2*math.trunc(len(final.columns)/2)-i],alpha=0.3,color='Pink')
 
-    if Plot_date != '':
-        final_plot_date[0].plot(ax=ax, color='Black', linewidth=2)
+			for i in range(0,math.trunc(len(final.columns)/2)):
+				ax.fill_between(path.index,path[i],path[2*math.trunc(len(final.columns)/2)-i-1],alpha=0.3,color='Pink')
 
-    plt.grid(linestyle='-.',linewidth=0.3)  
+		else:
 
-    fig2, ax2 = plt.subplots(figsize=(15,12))
+			for i in [x for x in range(len(path.columns)) if x != math.trunc(len(path.columns)/2)]:
+				path[i].plot(ax=ax, color='Red', linewidth=0)
 
-    ax2.set_xlabel('Days')
-    ax2.set_ylabel('[%]')
-    ax2.set_xlim(Range_start,Range_end)
-    final.plot(ax=ax2)
-    plt.legend(loc='upper left')
+			path[math.trunc(len(path.columns)/2)].plot(ax=ax, color='Red', linewidth=0.1)    # mid line
 
-    ax2.yaxis.grid(True, which='major')
-    ax2.yaxis.grid(True, which='minor')
 
-    if Plot_date != '':
-            final_plot_date[0].plot(ax=ax2, color='Black', linewidth=3)
+			for i in [x for x in range(len(path.columns)) if x != math.trunc(len(path.columns)/2)]:
+				ax.fill_between(path.index,path[i],path[2*math.trunc(len(final.columns)/2)-i],alpha=0.3,color='Pink')
 
-    plt.grid(linestyle='-.',linewidth=0.3)
+		if Plot_date != '':
+			final_plot_date[0].plot(ax=ax, color='Black', linewidth=2)
+
+		plt.grid(linestyle='-.',linewidth=0.3)  
+
+		fig2, ax2 = plt.subplots(figsize=(15,12))
+
+		ax2.set_xlabel('Days')
+		ax2.set_ylabel('[%]')
+		ax2.set_xlim(Range_start,Range_end)
+		final.plot(ax=ax2)
+		plt.legend(loc='upper left')
+
+		ax2.yaxis.grid(True, which='major')
+		ax2.yaxis.grid(True, which='minor')
+
+		if Plot_date != '':
+				final_plot_date[0].plot(ax=ax2, color='Black', linewidth=3)
+
+		plt.grid(linestyle='-.',linewidth=0.3)
 
 class checker:
 
 	def FindExtremes(df, column, first_rolling, second_rolling, final_format):
+	
+		"""
+		Find extremes of time series. 
+		
+		df: pandas DataFrame with dates as index, column: column with data, first_rolling: first MA to find extremes (higher than second_rolling), second rolling, final_format: df, highs or lows (list format)
+		"""
 
 		dfx = df.copy()
 
@@ -293,6 +299,54 @@ class checker:
 
 
 		return(final)
+		
+	def crossing(df,column,level,direction,stop_level):
+	
+		"""
+		Find dates for points when time series cross selected level. Stop_level can be used to choose only valid points.
+
+		df: pandas DataFrame, column: column with data, level: level for crossing, direction: up or down, stop_level: level that must be crossed after giving a signal to show another one
+		"""
+	
+		df = df.copy()
+		
+		indexes = []
+		stop = False
+		
+		if direction == 'down':
+			for i in range(1,len(df)):
+				if stop == True:
+					if ((df.loc[i,column]>=stop_level) & (df.loc[i,column] > df.loc[i-1,column])):
+						stop = False
+						continue
+				if ((df.loc[i,column]<=level) & (df.loc[i,column] < df.loc[i-1,column]) & (stop == False)):
+					indexes.append(i)
+					stop = True
+					
+		elif direction == 'up':
+			for i in range(1,len(df)):
+				if stop == True:
+					if ((df.loc[i,column]<=stop_level) & (df.loc[i,column] > df.loc[i-1,column])):
+						stop = False
+						continue
+				if ((df.loc[i,column]>=level) & (df.loc[i,column] > df.loc[i-1,column]) & (stop == False)):
+					indexes.append(i)
+					stop = True
+					
+		dates = []
+		
+		for i in indexes:
+			dates.append(df.loc[i,'Date'])       
+			
+			
+		df.set_index('Date',inplace=True)
+
+		ax = df[column].plot(x='Date',y=column,figsize=(15,12), markevery=indexes,style='s-')
+		
+		for dat in dates:
+			plt.axvline(x=dat, color='k', linestyle='--')       
+				
+		return(dates)	
 	
 class downloader:
 	def stooq(Symbol, Interval, Part = False, Date_from = '2000-01-01', Date_to = '2100-01-01', Open=False, High=False, Low=False, Close=True, Volume=False):
@@ -330,6 +384,18 @@ class downloader:
 		return data
 
 class indicators:
+	
+	def IndexRollingMA(df,column,rolling,avg_2):
+		
+		df = df.copy()
+		df['avg'] = df[column].rolling(window=rolling).mean()
+		df.dropna(inplace=True)
+		df.reset_index(inplace=True,drop=True)
+		df['avg_2'] = df['avg'].pct_change(periods=avg_2)
+		df.dropna(inplace=True)
+		df.reset_index(inplace=True,drop=True)
+		
+		return(df)
 	
 	def OECD_growing_countries():
 	
