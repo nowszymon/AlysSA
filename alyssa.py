@@ -2,9 +2,62 @@ import pandas as pd
 import math
 import matplotlib.pyplot as plt
 from datetime import timedelta
+from dateutil import parser 
 
 class paths:
-	def Paths(df,dates,column,Range_start, Range_end, Plot_date, fix_dates):
+	
+	def MargaRET(df, Column, Cut_off_date):
+
+		"""
+		MargaRET predicts future values based on correlation of actual quotes with historical ones.
+		
+		df: pandas DataFrame - 'Date' as separate column, Column: Column with data, Cut_off_date: cut-off date.
+		"""
+
+		cut_off_index = df.index[df['Date'] == Cut_off_date][0]
+		
+		cut_data = pd.DataFrame()
+		for i in range(cut_off_index,len(df)):
+			cut_data.loc[i,Column] = df.loc[i,Column]
+			
+		cut_data.reset_index(inplace=True,drop=True)	
+		df = df[:cut_off_index]
+		
+		slices = pd.DataFrame()
+		for i in range(0,(len(df)-len(cut_data))):
+			for x in range(0,len(cut_data)):
+				slices.loc[x,i] = df.loc[i+x, Column]
+				
+		correlation_table = pd.DataFrame()		
+		for i in slices:
+			correlation_table.loc[i,'Correlation'] = cut_data[Column].corr(slices[i])
+			
+		max_corr = correlation_table['Correlation'].idxmax()
+
+		final = pd.DataFrame()
+		final['Projection'] = df.loc[max_corr:(max_corr+2*len(cut_data)),Column]
+		final.reset_index(inplace=True,drop=True)
+		final[Column] = cut_data
+		
+		dates = df.loc[max_corr:(max_corr+2*len(cut_data)),'Date']
+		final.set_index(dates,inplace=True,drop=True)
+		
+		fig, ax = plt.subplots(figsize=(15,10))
+		ax.plot(final['Projection'],color='red',linestyle='--', alpha=0.5)
+		ax2 = ax.twinx()
+		ax2.plot(final[Column])
+
+		ax.set_title('{} projection (r = {}%)'.format(Column,"%.2f" % (correlation_table['Correlation'].max()*100)),fontsize=15)
+		ax.set_ylabel('Projection')
+		ax2.set_ylabel(Column)
+		
+		ax.legend(loc=2)
+		ax2.legend()
+		
+		# anchored_text = AnchoredText('                AlysSA v0.15b\n  Algorithmic\'n\'Statistical Analysis\n       www.szymonnowak.com', loc=3)
+		# ax.add_artist(anchored_text)
+	
+	def Paths(df,dates,column,Range_start, Range_end, Plot_date, fix_dates, x_label='Days'):
 
 		"""
 		Generate price paths from historical data.
@@ -103,12 +156,18 @@ class paths:
 				b = None 
 
 		path.index = final.index 
+		
+		# mean
+		
+		mean = pd.DataFrame()
+		
+		mean['mean'] = final.mean(axis=1)
 
 		# chart                
 
 		fig, ax = plt.subplots(figsize=(15,12))
 
-		ax.set_xlabel('Days')
+		ax.set_xlabel(x_label)
 		ax.set_ylabel('[%]')
 		ax.set_xlim(Range_start,Range_end)
 
@@ -140,7 +199,7 @@ class paths:
 
 		fig2, ax2 = plt.subplots(figsize=(15,12))
 
-		ax2.set_xlabel('Days')
+		ax2.set_xlabel(x_label)
 		ax2.set_ylabel('[%]')
 		ax2.set_xlim(Range_start,Range_end)
 		final.plot(ax=ax2)
@@ -154,6 +213,21 @@ class paths:
 
 		plt.grid(linestyle='-.',linewidth=0.3)
 
+		fig3, ax3 = plt.subplots(figsize=(15,12))
+		
+		ax3.set_xlabel(x_label)
+		ax3.set_ylabel('[%]')
+		ax3.set_xlim(Range_start,Range_end)
+		mean['mean'].plot(ax=ax3)
+		
+		ax2.yaxis.grid(True, which='major')
+		ax2.yaxis.grid(True, which='minor')
+		
+		if Plot_date != '':
+			final_plot_date[0].plot(ax=ax3, color='Black', linewidth=3)
+		
+		plt.grid(linestyle='-.',linewidth=0.3)		
+		
 class checker:
 
 	def FindExtremes(df, column, first_rolling, second_rolling, final_format):
@@ -523,3 +597,346 @@ class indicators:
 		
 		return(growing_countries)
 		
+	def WIGIndicators(index='WIG'):
+
+		import numpy as np
+		import datetime
+
+		if index == 'WIG':
+
+			wig = downloader.stooq('WIG','d')
+			wigPE = downloader.stooq('WIG_PE','d')
+			wigPB = downloader.stooq('WIG_PB','d')
+			wigDY = downloader.stooq('WIG_DY','d')
+			wigMV = downloader.stooq('WIG_MV','d')
+
+			wig.set_index('Date',inplace=True,drop=True)
+			wigPE.set_index('Date',inplace=True,drop=True)
+			wigPB.set_index('Date',inplace=True,drop=True)
+			wigDY.set_index('Date',inplace=True,drop=True)
+			wigMV.set_index('Date',inplace=True,drop=True)
+
+			wig_mean = [np.mean(wig)]*len(wig)
+			wigPE_mean = [np.mean(wigPE)]*len(wigPE)
+			wigPB_mean = [np.mean(wigPB)]*len(wigPB)
+			wigDY_mean = [np.mean(wigDY)]*len(wigDY)
+			wigMV_mean = [np.mean(wigMV)]*len(wigMV)
+
+			fig = plt.figure(figsize=(15,15))
+
+			ax1 = plt.subplot2grid((10,2), (0,0),rowspan=4,colspan=2)
+			ax2 = plt.subplot2grid((10,2), (4,0),rowspan=3,colspan=1)
+			ax3 = plt.subplot2grid((10,2), (4,1),rowspan=3,colspan=1)
+			ax4 = plt.subplot2grid((10,2), (7,0),rowspan=3,colspan=1)
+			ax5 = plt.subplot2grid((10,2), (7,1),rowspan=3,colspan=1)
+
+			ax1.set_title('WIG',fontsize=15)
+			ax2.set_title('P/E')
+			ax3.set_title('P/BV')
+			ax4.set_title('Dividend Yield')
+			ax5.set_title('Market Value')
+
+			ax1.plot(wig)
+			ax2.plot(wigPE)
+			ax3.plot(wigPB)
+			ax4.plot(wigDY)
+			ax5.plot(wigMV)
+
+			ax1.plot(wig.index.values,wig_mean, linestyle='--', label='average')
+			ax2.plot(wigPE.index.values,wigPE_mean, linestyle='--', label='average')
+			ax3.plot(wigPB.index.values,wigPB_mean, linestyle='--', label='average')
+			ax4.plot(wigDY.index.values,wigDY_mean, linestyle='--', label='average')
+			ax5.plot(wigMV.index.values,wigMV_mean, linestyle='--', label='average')
+
+			bbox_props = dict(boxstyle='larrow')
+			bbox_props_2 = dict(boxstyle='larrow', color='orange')
+			ax1.annotate(str(wig['WIG'][-1]), (wig.index[-1], wig['WIG'][-1]), xytext = (wig.index[-1]+ datetime.timedelta(weeks=90), wig['WIG'][-1]),bbox=bbox_props,color='white')
+			ax2.annotate(str(round(wigPE['WIG_PE'][-1],2)), (wigPE.index[-1], wigPE['WIG_PE'][-1]), xytext = (wigPE.index[-1]+ datetime.timedelta(weeks=35), wigPE['WIG_PE'][-1]),bbox=bbox_props,color='white')
+			ax3.annotate(str(round(wigPB['WIG_PB'][-1],2)), (wigPB.index[-1], wigPB['WIG_PB'][-1]), xytext = (wigPB.index[-1]+ datetime.timedelta(weeks=43), wigPB['WIG_PB'][-1]),bbox=bbox_props,color='white')
+			ax4.annotate(str(round(wigDY['WIG_DY'][-1],2)), (wigDY.index[-1], wigDY['WIG_DY'][-1]), xytext = (wigDY.index[-1]+ datetime.timedelta(weeks=35), wigDY['WIG_DY'][-1]),bbox=bbox_props,color='white')
+			ax5.annotate(str(round(wigMV['WIG_MV'][-1],2)), (wigMV.index[-1], wigMV['WIG_MV'][-1]), xytext = (wigMV.index[-1]+ datetime.timedelta(weeks=43), wigMV['WIG_MV'][-1]),bbox=bbox_props,color='white')
+
+			ax1.legend()
+			ax2.legend()
+			ax3.legend()
+			ax4.legend()
+			ax5.legend()
+
+			plt.tight_layout()
+			plt.annotate('by @SzymonNowak1do1', (0,0), (350,-30), xycoords='axes fraction', textcoords='offset points', va='top')
+			plt.show()
+			
+		elif index == 'mWIG40':
+
+			mwig40 = downloader.stooq('MWIG40','d')
+			mwig40TR = downloader.stooq('MWIG40TR','d')
+			mwig40PE = downloader.stooq('MWIG40_PE','d')
+			mwig40PB = downloader.stooq('MWIG40_PB','d')
+			mwig40DY = downloader.stooq('MWIG40_DY','d')
+			mwig40MV = downloader.stooq('MWIG40_MV','d')
+
+			mwig40.set_index('Date',inplace=True,drop=True)
+			mwig40TR.set_index('Date',inplace=True,drop=True)
+			mwig40PE.set_index('Date',inplace=True,drop=True)
+			mwig40PB.set_index('Date',inplace=True,drop=True)
+			mwig40DY.set_index('Date',inplace=True,drop=True)
+			mwig40MV.set_index('Date',inplace=True,drop=True)
+
+			mwig40_mean = [np.mean(mwig40)]*len(mwig40)
+			mwig40TR_mean = [np.mean(mwig40TR)]*len(mwig40TR)
+			mwig40PE_mean = [np.mean(mwig40PE)]*len(mwig40PE)
+			mwig40PB_mean = [np.mean(mwig40PB)]*len(mwig40PB)
+			mwig40DY_mean = [np.mean(mwig40DY)]*len(mwig40DY)
+			mwig40MV_mean = [np.mean(mwig40MV)]*len(mwig40MV)
+
+			fig = plt.figure(figsize=(15,15))
+
+			ax1 = plt.subplot2grid((10,2), (0,0),rowspan=4,colspan=2)
+			ax2 = plt.subplot2grid((10,2), (4,0),rowspan=3,colspan=1)
+			ax3 = plt.subplot2grid((10,2), (4,1),rowspan=3,colspan=1)
+			ax4 = plt.subplot2grid((10,2), (7,0),rowspan=3,colspan=1)
+			ax5 = plt.subplot2grid((10,2), (7,1),rowspan=3,colspan=1)
+
+			ax1.set_title('mWIG40',fontsize=15)
+			ax2.set_title('P/E')
+			ax3.set_title('P/BV')
+			ax4.set_title('Dividend Yield')
+			ax5.set_title('Market Value')
+
+			ax1.plot(mwig40,label='mWIG40')
+			ax1.plot(mwig40TR, label='mWIG40 TR')
+			ax2.plot(mwig40PE)
+			ax4.plot(mwig40DY)
+			ax3.plot(mwig40PB)
+			ax5.plot(mwig40MV)
+
+			ax1.plot(mwig40.index.values,mwig40_mean, linestyle='--', label='average')
+			ax1.plot(mwig40TR.index.values,mwig40TR_mean, linestyle='--', label='TR average')
+			ax2.plot(mwig40PE.index.values,mwig40PE_mean, linestyle='--', label='average')
+			ax4.plot(mwig40DY.index.values,mwig40DY_mean, linestyle='--', label='average')
+			ax3.plot(mwig40PB.index.values,mwig40PB_mean, linestyle='--', label='average')
+			ax5.plot(mwig40MV.index.values,mwig40MV_mean, linestyle='--', label='average')
+
+			bbox_props = dict(boxstyle='larrow')
+			bbox_props_2 = dict(boxstyle='larrow', color='orange')
+			ax1.annotate(str(round(mwig40['MWIG40'][-1],2)), (mwig40.index[-1], mwig40['MWIG40'][-1]), xytext = (mwig40.index[-1]+ datetime.timedelta(weeks=65), mwig40['MWIG40'][-1]),bbox=bbox_props,color='white')
+			ax1.annotate(str(round(mwig40TR['MWIG40TR'][-1],2)), (mwig40TR.index[-1], mwig40TR['MWIG40TR'][-1]), xytext = (mwig40TR.index[-1]+ datetime.timedelta(weeks=65), mwig40TR['MWIG40TR'][-1]),bbox=bbox_props_2,color='black')
+			ax2.annotate(str(round(mwig40PE['MWIG40_PE'][-1],2)), (mwig40PE.index[-1], mwig40PE['MWIG40_PE'][-1]), xytext = (mwig40PE.index[-1]+ datetime.timedelta(weeks=35), mwig40PE['MWIG40_PE'][-1]),bbox=bbox_props,color='white')
+			ax4.annotate(str(round(mwig40DY['MWIG40_DY'][-1],2)), (mwig40DY.index[-1], mwig40DY['MWIG40_DY'][-1]), xytext = (mwig40DY.index[-1]+ datetime.timedelta(weeks=43), mwig40DY['MWIG40_DY'][-1]),bbox=bbox_props,color='white')
+			ax3.annotate(str(round(mwig40PB['MWIG40_PB'][-1],2)), (mwig40PB.index[-1], mwig40PB['MWIG40_PB'][-1]), xytext = (mwig40PB.index[-1]+ datetime.timedelta(weeks=35), mwig40PB['MWIG40_PB'][-1]),bbox=bbox_props,color='white')
+			ax5.annotate(str(round(mwig40MV['MWIG40_MV'][-1],2)), (mwig40MV.index[-1], mwig40MV['MWIG40_MV'][-1]), xytext = (mwig40MV.index[-1]+ datetime.timedelta(weeks=43), mwig40MV['MWIG40_MV'][-1]),bbox=bbox_props,color='white')
+
+			ax1.legend()
+			ax2.legend()
+			ax3.legend()
+			ax4.legend()
+			ax5.legend()
+
+			plt.tight_layout()
+			plt.annotate('by @SzymonNowak1do1', (0,0), (350,-30), xycoords='axes fraction', textcoords='offset points', va='top')
+			plt.show()
+
+		elif index == 'sWIG80':
+
+			mwig40 = downloader.stooq('SWIG80','d')
+			mwig40TR = downloader.stooq('SWIG80TR','d')
+			mwig40PE = downloader.stooq('SWIG80_PE','d')
+			mwig40PB = downloader.stooq('SWIG80_PB','d')
+			mwig40DY = downloader.stooq('SWIG80_DY','d')
+			mwig40MV = downloader.stooq('SWIG80_MV','d')
+
+			mwig40.set_index('Date',inplace=True,drop=True)
+			mwig40TR.set_index('Date',inplace=True,drop=True)
+			mwig40PE.set_index('Date',inplace=True,drop=True)
+			mwig40PB.set_index('Date',inplace=True,drop=True)
+			mwig40DY.set_index('Date',inplace=True,drop=True)
+			mwig40MV.set_index('Date',inplace=True,drop=True)
+
+			mwig40_mean = [np.mean(mwig40)]*len(mwig40)
+			mwig40TR_mean = [np.mean(mwig40TR)]*len(mwig40TR)
+			mwig40PE_mean = [np.mean(mwig40PE)]*len(mwig40PE)
+			mwig40PB_mean = [np.mean(mwig40PB)]*len(mwig40PB)
+			mwig40DY_mean = [np.mean(mwig40DY)]*len(mwig40DY)
+			mwig40MV_mean = [np.mean(mwig40MV)]*len(mwig40MV)
+
+			fig = plt.figure(figsize=(15,15))
+
+			ax1 = plt.subplot2grid((10,2), (0,0),rowspan=4,colspan=2)
+			ax2 = plt.subplot2grid((10,2), (4,0),rowspan=3,colspan=1)
+			ax3 = plt.subplot2grid((10,2), (4,1),rowspan=3,colspan=1)
+			ax4 = plt.subplot2grid((10,2), (7,0),rowspan=3,colspan=1)
+			ax5 = plt.subplot2grid((10,2), (7,1),rowspan=3,colspan=1)
+
+			ax1.set_title('sWIG40',fontsize=15)
+			ax2.set_title('P/E')
+			ax3.set_title('P/BV')
+			ax4.set_title('Dividend Yield')
+			ax5.set_title('Market Value')
+
+			ax1.plot(mwig40,label='sWIG80')
+			ax1.plot(mwig40TR, label='sWIG80 TR')
+			ax2.plot(mwig40PE)
+			ax4.plot(mwig40DY)
+			ax3.plot(mwig40PB)
+			ax5.plot(mwig40MV)
+
+			ax1.plot(mwig40.index.values,mwig40_mean, linestyle='--', label='average')
+			ax1.plot(mwig40TR.index.values,mwig40TR_mean, linestyle='--', label='TR average')
+			ax2.plot(mwig40PE.index.values,mwig40PE_mean, linestyle='--', label='average')
+			ax4.plot(mwig40DY.index.values,mwig40DY_mean, linestyle='--', label='average')
+			ax3.plot(mwig40PB.index.values,mwig40PB_mean, linestyle='--', label='average')
+			ax5.plot(mwig40MV.index.values,mwig40MV_mean, linestyle='--', label='average')
+
+			bbox_props = dict(boxstyle='larrow')
+			bbox_props_2 = dict(boxstyle='larrow', color='orange')
+			ax1.annotate(str(round(mwig40['SWIG80'][-1],2)), (mwig40.index[-1], mwig40['SWIG80'][-1]), xytext = (mwig40.index[-1]+ datetime.timedelta(weeks=65), mwig40['SWIG80'][-1]),bbox=bbox_props,color='white')
+			ax1.annotate(str(round(mwig40TR['SWIG80TR'][-1],2)), (mwig40TR.index[-1], mwig40TR['SWIG80TR'][-1]), xytext = (mwig40TR.index[-1]+ datetime.timedelta(weeks=65), mwig40TR['SWIG80TR'][-1]),bbox=bbox_props_2,color='black')
+			ax2.annotate(str(round(mwig40PE['SWIG80_PE'][-1],2)), (mwig40PE.index[-1], mwig40PE['SWIG80_PE'][-1]), xytext = (mwig40PE.index[-1]+ datetime.timedelta(weeks=35), mwig40PE['SWIG80_PE'][-1]),bbox=bbox_props,color='white')
+			ax4.annotate(str(round(mwig40DY['SWIG80_DY'][-1],2)), (mwig40DY.index[-1], mwig40DY['SWIG80_DY'][-1]), xytext = (mwig40DY.index[-1]+ datetime.timedelta(weeks=43), mwig40DY['SWIG80_DY'][-1]),bbox=bbox_props,color='white')
+			ax3.annotate(str(round(mwig40PB['SWIG80_PB'][-1],2)), (mwig40PB.index[-1], mwig40PB['SWIG80_PB'][-1]), xytext = (mwig40PB.index[-1]+ datetime.timedelta(weeks=35), mwig40PB['SWIG80_PB'][-1]),bbox=bbox_props,color='white')
+			ax5.annotate(str(round(mwig40MV['SWIG80_MV'][-1],2)), (mwig40MV.index[-1], mwig40MV['SWIG80_MV'][-1]), xytext = (mwig40MV.index[-1]+ datetime.timedelta(weeks=43), mwig40MV['SWIG80_MV'][-1]),bbox=bbox_props,color='white')
+
+			ax1.legend()
+			ax2.legend()
+			ax3.legend()
+			ax4.legend()
+			ax5.legend()
+
+			plt.tight_layout()
+			plt.annotate('by @SzymonNowak1do1', (0,0), (350,-30), xycoords='axes fraction', textcoords='offset points', va='top')
+			plt.show()
+
+		elif index == 'WIG20':
+
+			mwig40 = downloader.stooq('WIG20','d')
+			mwig40TR = downloader.stooq('WIG20TR','d')
+			mwig40PE = downloader.stooq('WIG20_PE','d')
+			mwig40PB = downloader.stooq('WIG20_PB','d')
+			mwig40DY = downloader.stooq('WIG20_DY','d')
+			mwig40MV = downloader.stooq('WIG20_MV','d')
+
+			mwig40.set_index('Date',inplace=True,drop=True)
+			mwig40TR.set_index('Date',inplace=True,drop=True)
+			mwig40PE.set_index('Date',inplace=True,drop=True)
+			mwig40PB.set_index('Date',inplace=True,drop=True)
+			mwig40DY.set_index('Date',inplace=True,drop=True)
+			mwig40MV.set_index('Date',inplace=True,drop=True)
+
+			mwig40_mean = [np.mean(mwig40)]*len(mwig40)
+			mwig40TR_mean = [np.mean(mwig40TR)]*len(mwig40TR)
+			mwig40PE_mean = [np.mean(mwig40PE)]*len(mwig40PE)
+			mwig40PB_mean = [np.mean(mwig40PB)]*len(mwig40PB)
+			mwig40DY_mean = [np.mean(mwig40DY)]*len(mwig40DY)
+			mwig40MV_mean = [np.mean(mwig40MV)]*len(mwig40MV)
+
+			fig = plt.figure(figsize=(15,15))
+
+			ax1 = plt.subplot2grid((10,2), (0,0),rowspan=4,colspan=2)
+			ax2 = plt.subplot2grid((10,2), (4,0),rowspan=3,colspan=1)
+			ax3 = plt.subplot2grid((10,2), (4,1),rowspan=3,colspan=1)
+			ax4 = plt.subplot2grid((10,2), (7,0),rowspan=3,colspan=1)
+			ax5 = plt.subplot2grid((10,2), (7,1),rowspan=3,colspan=1)
+
+			ax1.set_title('WIG20',fontsize=15)
+			ax2.set_title('P/E')
+			ax3.set_title('P/BV')
+			ax4.set_title('Dividend Yield')
+			ax5.set_title('Market Value')
+
+			ax1.plot(mwig40,label='WIG20')
+			ax1.plot(mwig40TR, label='WIG20 TR')
+			ax2.plot(mwig40PE)
+			ax3.plot(mwig40DY)
+			ax4.plot(mwig40PB)
+			ax5.plot(mwig40MV)
+
+			ax1.plot(mwig40.index.values,mwig40_mean, linestyle='--', label='average')
+			ax1.plot(mwig40TR.index.values,mwig40TR_mean, linestyle='--', label='TR average')
+			ax2.plot(mwig40PE.index.values,mwig40PE_mean, linestyle='--', label='average')
+			ax4.plot(mwig40DY.index.values,mwig40DY_mean, linestyle='--', label='average')
+			ax3.plot(mwig40PB.index.values,mwig40PB_mean, linestyle='--', label='average')
+			ax5.plot(mwig40MV.index.values,mwig40MV_mean, linestyle='--', label='average')
+
+			bbox_props = dict(boxstyle='larrow')
+			bbox_props_2 = dict(boxstyle='larrow', color='orange')
+			ax1.annotate(str(round(mwig40['WIG20'][-1],2)), (mwig40.index[-1], mwig40['WIG20'][-1]), xytext = (mwig40.index[-1]+ datetime.timedelta(weeks=65), mwig40['WIG20'][-1]),bbox=bbox_props,color='white')
+			ax1.annotate(str(round(mwig40TR['WIG20TR'][-1],2)), (mwig40TR.index[-1], mwig40TR['WIG20TR'][-1]), xytext = (mwig40TR.index[-1]+ datetime.timedelta(weeks=65), mwig40TR['WIG20TR'][-1]),bbox=bbox_props_2,color='black')
+			ax2.annotate(str(round(mwig40PE['WIG20_PE'][-1],2)), (mwig40PE.index[-1], mwig40PE['WIG20_PE'][-1]), xytext = (mwig40PE.index[-1]+ datetime.timedelta(weeks=35), mwig40PE['WIG20_PE'][-1]),bbox=bbox_props,color='white')
+			ax3.annotate(str(round(mwig40DY['WIG20_DY'][-1],2)), (mwig40DY.index[-1], mwig40DY['WIG20_DY'][-1]), xytext = (mwig40DY.index[-1]+ datetime.timedelta(weeks=43), mwig40DY['WIG20_DY'][-1]),bbox=bbox_props,color='white')
+			ax3.annotate(str(round(mwig40PB['WIG20_PB'][-1],2)), (mwig40PB.index[-1], mwig40PB['WIG20_PB'][-1]), xytext = (mwig40PB.index[-1]+ datetime.timedelta(weeks=35), mwig40PB['WIG20_PB'][-1]),bbox=bbox_props,color='white')
+			ax5.annotate(str(round(mwig40MV['WIG20_MV'][-1],2)), (mwig40MV.index[-1], mwig40MV['WIG20_MV'][-1]), xytext = (mwig40MV.index[-1]+ datetime.timedelta(weeks=43), mwig40MV['WIG20_MV'][-1]),bbox=bbox_props,color='white')
+
+			ax1.legend()
+			ax2.legend()
+			ax3.legend()
+			ax4.legend()
+			ax5.legend()
+
+			plt.tight_layout()
+			plt.annotate('by @SzymonNowak1do1', (0,0), (350,-30), xycoords='axes fraction', textcoords='offset points', va='top')
+			plt.show()
+			
+		elif index == 'NC':
+		
+			wig = downloader.stooq('NCINDEX','d')
+			wigPE = downloader.stooq('NCINDEX_PE','d')
+			wigPB = downloader.stooq('NCINDEX_PB','d')
+			wigDY = downloader.stooq('NCINDEX_DY','d')
+			wigMV = downloader.stooq('NCINDEX_MV','d')
+
+			wig.set_index('Date',inplace=True,drop=True)
+			wigPE.set_index('Date',inplace=True,drop=True)
+			wigPB.set_index('Date',inplace=True,drop=True)
+			wigDY.set_index('Date',inplace=True,drop=True)
+			wigMV.set_index('Date',inplace=True,drop=True)
+
+			wig_mean = [np.mean(wig)]*len(wig)
+			wigPE_mean = [np.mean(wigPE)]*len(wigPE)
+			wigPB_mean = [np.mean(wigPB)]*len(wigPB)
+			wigDY_mean = [np.mean(wigDY)]*len(wigDY)
+			wigMV_mean = [np.mean(wigMV)]*len(wigMV)
+
+			fig = plt.figure(figsize=(15,15))
+
+			ax1 = plt.subplot2grid((10,2), (0,0),rowspan=4,colspan=2)
+			ax2 = plt.subplot2grid((10,2), (4,0),rowspan=3,colspan=1)
+			ax3 = plt.subplot2grid((10,2), (4,1),rowspan=3,colspan=1)
+			ax4 = plt.subplot2grid((10,2), (7,0),rowspan=3,colspan=1)
+			ax5 = plt.subplot2grid((10,2), (7,1),rowspan=3,colspan=1)
+
+			ax1.set_title('NC Index',fontsize=15)
+			ax2.set_title('P/E')
+			ax3.set_title('P/BV')
+			ax4.set_title('Dividend Yield')
+			ax5.set_title('Market Value')
+
+			ax1.plot(wig)
+			ax2.plot(wigPE)
+			ax3.plot(wigPB)
+			ax4.plot(wigDY)
+			ax5.plot(wigMV)
+
+			ax1.plot(wig.index.values,wig_mean, linestyle='--', label='average')
+			ax2.plot(wigPE.index.values,wigPE_mean, linestyle='--', label='average')
+			ax3.plot(wigPB.index.values,wigPB_mean, linestyle='--', label='average')
+			ax4.plot(wigDY.index.values,wigDY_mean, linestyle='--', label='average')
+			ax5.plot(wigMV.index.values,wigMV_mean, linestyle='--', label='average')
+
+			bbox_props = dict(boxstyle='larrow')
+			bbox_props_2 = dict(boxstyle='larrow', color='orange')
+			ax1.annotate(str(round(wig['NCINDEX'][-1],2)), (wig.index[-1], wig['NCINDEX'][-1]), xytext = (wig.index[-1]+ datetime.timedelta(weeks=35), wig['NCINDEX'][-1]),bbox=bbox_props,color='white')
+			ax2.annotate(str(round(wigPE['NCINDEX_PE'][-1],2)), (wigPE.index[-1], wigPE['NCINDEX_PE'][-1]), xytext = (wigPE.index[-1]+ datetime.timedelta(weeks=35), wigPE['NCINDEX_PE'][-1]),bbox=bbox_props,color='white')
+			ax3.annotate(str(round(wigPB['NCINDEX_PB'][-1],2)), (wigPB.index[-1], wigPB['NCINDEX_PB'][-1]), xytext = (wigPB.index[-1]+ datetime.timedelta(weeks=43), wigPB['NCINDEX_PB'][-1]),bbox=bbox_props,color='white')
+			ax4.annotate(str(round(wigDY['NCINDEX_DY'][-1],2)), (wigDY.index[-1], wigDY['NCINDEX_DY'][-1]), xytext = (wigDY.index[-1]+ datetime.timedelta(weeks=35), wigDY['NCINDEX_DY'][-1]),bbox=bbox_props,color='white')
+			ax5.annotate(str(round(wigMV['NCINDEX_MV'][-1],2)), (wigMV.index[-1], wigMV['NCINDEX_MV'][-1]), xytext = (wigMV.index[-1]+ datetime.timedelta(weeks=43), wigMV['NCINDEX_MV'][-1]),bbox=bbox_props,color='white')
+
+			ax1.legend()
+			ax2.legend()
+			ax3.legend()
+			ax4.legend()
+			ax5.legend()
+
+			plt.tight_layout()
+			plt.annotate('by @SzymonNowak1do1', (0,0), (350,-30), xycoords='axes fraction', textcoords='offset points', va='top')
+			plt.show()			
+			
