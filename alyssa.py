@@ -195,6 +195,7 @@ class paths:
 		if Plot_date != '':
 			final_plot_date[0].plot(ax=ax, color='Black', linewidth=2)
 
+		mean['mean'].plot(ax=ax, color = 'Blue',alpha=0.4)	
 		plt.grid(linestyle='-.',linewidth=0.3)  
 
 		fig2, ax2 = plt.subplots(figsize=(15,12))
@@ -227,6 +228,57 @@ class paths:
 			final_plot_date[0].plot(ax=ax3, color='Black', linewidth=3)
 		
 		plt.grid(linestyle='-.',linewidth=0.3)		
+		
+	def seasonalitypattern(df,column):
+
+			import matplotlib.ticker as ticker
+	
+			dfx = df.copy()
+			
+			for i in range(0,len(dfx)):
+				dfx.loc[i,'Year'] = dfx.loc[i,'Date'].year
+				dfx.loc[i,'MonthDate'] = dfx.loc[i,'Date'].strftime('%m/%d')
+				
+			final = pd.pivot_table(dfx,values=column,columns='Year',index='MonthDate')	
+			
+			column_names = list(final)
+			column_names = [int(x) for x in column_names]
+			
+			actual = final.iloc[:,-1]
+			actual.fillna(method='backfill', inplace = True)
+			for x in range(1,len(actual)):
+				actual[x] = ((actual[x]/actual[0])*100)-100
+			actual[0] = 0   
+			final.drop(final.columns[-1], axis=1, inplace=True)
+			
+			final.fillna(method='backfill', inplace = True)
+			final.fillna(method='ffill', inplace = True) 
+			
+			final.reset_index(inplace=True)
+			
+			MonthDate = final['MonthDate']
+			
+			final.drop(final.columns[[0]], axis=1, inplace=True)
+			
+			for i in final:
+				for x in range(1,len(final)):
+					final.loc[x,i] = ((final.loc[x,i]/final.loc[0,i])*100)-100
+
+			final.loc[0,:] = 0
+			
+			final['mean'] = final.mean(axis=1)
+			final.set_index(MonthDate,inplace=True,drop=True)
+			final['Actual'] = actual
+			
+			fig, ax = plt.subplots(figsize=(15,10))
+			ax.plot(final['mean'],color='red',linestyle='--', alpha=0.5,label='Average for {}-{}'.format(column_names[0],column_names[-2]))
+			ax.plot(final['Actual'], label='{}'.format(column_names[-1]))
+			ax.set_title('Seasonality pattern',fontsize=20)
+			plt.xticks(rotation=45)
+			tick_spacing = 15
+			ax.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
+			ax.legend()
+
 		
 class checker:
 
@@ -373,14 +425,54 @@ class checker:
 
 
 		return(final)
+
+	def crossing(data,column,value,type,reset):
 		
-	def crossing(df,column,level,direction,stop_level):
-	
 		"""
+		Find dates for points when time series cross selected level. Reset can be used to choose only valid points.
+
+		df: pandas DataFrame, column: column with data, level: value for crossing, direction: up or down, reset: level that must be crossed after giving a signal to show another one
+		"""		
+		
+		df = data.copy()
+		
+		dates_id = []    
+		dates = []
+		stop = False
+		
+		for i in range(1,len(df)):
+			if type == 'less':
+				if ((df.iloc[i-1,1]>=value) & (df.iloc[i,1]<value) & (stop == False)):
+					dates_id.append(i)
+					stop = True
+				elif ((df.iloc[i-1,1]<=reset) & (df.iloc[i,1]>reset) & (stop == True)):
+					stop = False
+			elif type == 'more':    
+				if ((df.iloc[i-1,1]<=value) & (df.iloc[i,1]>value) & (stop == False)):
+					dates_id.append(i)
+					stop = True
+				elif ((df.iloc[i-1,1]>=reset) & (df.iloc[i,1]<reset) & (stop == True)):
+					stop = False                
+		
+		for i in dates_id:
+			dates.append(df.loc[i,'Date'])
+			
+		df.set_index('Date',inplace=True)    
+		
+		ax = df[column].plot(figsize=(15,12), markevery=dates_id,style='s-')
+
+		for dat in dates:
+			plt.axvline(x=dat, color='k', linestyle='--')       
+				
+		return(dates)
+		
+"""	def crossing(df,column,level,direction,stop_level):
+	
+		
 		Find dates for points when time series cross selected level. Stop_level can be used to choose only valid points.
 
 		df: pandas DataFrame, column: column with data, level: level for crossing, direction: up or down, stop_level: level that must be crossed after giving a signal to show another one
-		"""
+		
 	
 		df = df.copy()
 		
@@ -421,7 +513,7 @@ class checker:
 			plt.axvline(x=dat, color='k', linestyle='--')       
 				
 		return(dates)	
-	
+"""	
 class downloader:
 	def stooq(Symbol, Interval, Part = False, Date_from = '2000-01-01', Date_to = '2100-01-01', Open=False, High=False, Low=False, Close=True, Volume=False):
 		"""
